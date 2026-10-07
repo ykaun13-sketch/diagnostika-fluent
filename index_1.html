@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Диагностика Fluent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700&family=Inter:wght@400;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+<style>
+  /* Self-paced phone quiz: no login, no live sync — each student goes through
+     the same question bank on their own screen with a local per-question timer. */
+  :root {
+    --bg: #F4F6FA;
+    --surface: #FFFFFF;
+    --surface-2: #EEF1F7;
+    --fg: #1B2340;
+    --muted: #5B6B8C;
+    --border: #DCE2EE;
+    --navy: #21295C;
+    --primary: #065A82;
+    --teal: #1C7293;
+    --good: #02C39A;
+    --good-bg: #E3FBF4;
+    --warn: #E8A33D;
+    --warn-bg: #FDF3E3;
+    --bad: #C0455C;
+    --bad-bg: #FBE7EA;
+    --shadow: 0 1px 2px rgba(27,35,64,.06), 0 8px 24px rgba(27,35,64,.08);
+    --font-head: "Fraunces", Georgia, "Times New Roman", serif;
+    --font-body: "Inter", -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #11152A; --surface: #171C38; --surface-2: #1E2444; --fg: #E8ECFB;
+      --muted: #97A2C7; --border: #2B3260; --navy: #8EA2FF; --primary: #4FB3E0;
+      --teal: #5FCBDC; --good: #39E6B4; --good-bg: #0E3A32; --warn: #F2BE68;
+      --warn-bg: #3C2E10; --bad: #F2798E; --bad-bg: #3C1620;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 28px rgba(0,0,0,.45);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #11152A; --surface: #171C38; --surface-2: #1E2444; --fg: #E8ECFB;
+    --muted: #97A2C7; --border: #2B3260; --navy: #8EA2FF; --primary: #4FB3E0;
+    --teal: #5FCBDC; --good: #39E6B4; --good-bg: #0E3A32; --warn: #F2BE68;
+    --warn-bg: #3C2E10; --bad: #F2798E; --bad-bg: #3C1620;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 28px rgba(0,0,0,.45);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--fg); font-family: var(--font-body);
+    padding-inline: 16px; padding-block: 20px; min-height: 100%;
+  }
+  h1, h2, h3 { font-family: var(--font-head); font-weight: 700; text-wrap: balance; margin: 0; }
+  p { margin: 0; }
+  .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .muted { color: var(--muted); }
+  button {
+    font-family: var(--font-body); cursor: pointer; border: 1px solid var(--border);
+    background: var(--surface); color: var(--fg); border-radius: 10px; padding: 12px 18px;
+    font-size: 15px; font-weight: 600; transition: transform .08s ease, background .15s ease;
+  }
+  button:active { transform: scale(.98); }
+  button.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+  button.navy { background: var(--navy); color: #fff; border-color: var(--navy); }
+  button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+  select, input[type=text], textarea {
+    font-family: var(--font-body); font-size: 15px; padding: 10px 12px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--fg); width: 100%;
+  }
+  textarea { resize: vertical; min-height: 90px; }
+  .wrap { max-width: 880px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    padding: 22px; box-shadow: var(--shadow); min-width: 0;
+  }
+  .eyebrow {
+    font-size: 11.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--teal);
+  }
+  .timerbar { height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+  .timerbar > div { height: 100%; background: var(--teal); transition: width .2s linear; }
+  .timerbar.low > div { background: var(--bad); }
+  .optrow {
+    display: flex; align-items: center; gap: 12px; padding: 13px 14px; border-radius: 10px;
+    border: 1px solid var(--border); cursor: pointer; background: var(--surface);
+  }
+  .optrow:hover { border-color: var(--teal); }
+  .optrow.selected { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, var(--surface)); }
+  .optrow span { min-width: 0; }
+  .field-row { display: grid; grid-template-columns: minmax(0,1fr) 150px; gap: 10px; align-items: center; }
+  .seq-row { display: flex; align-items: center; gap: 10px; }
+  .seq-row select { width: 76px; flex: none; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+  th { color: var(--muted); font-weight: 700; font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; }
+  .tablewrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); }
+  .qa-stage { display: flex; flex-direction: column; gap: 18px; }
+  .big-q { font-size: 21px; line-height: 1.35; font-family: var(--font-head); font-weight: 700; text-wrap: balance; }
+  .hint { font-size: 13px; color: var(--muted); }
+  .center { text-align: center; }
+  .toast {
+    position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%); background: var(--navy); color: #fff; padding: 11px 18px;
+    border-radius: 999px; font-size: 13.5px; font-weight: 600; box-shadow: var(--shadow); z-index: 50;
+  }
+  .flex-between { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .lab-tag { font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: 7px; display: inline-block; }
+  .lab-tag.l1 { background: var(--warn-bg); color: var(--warn); }
+  .lab-tag.l2 { background: var(--good-bg); color: var(--good); }
+  @media (max-width: 480px) { .big-q { font-size: 18.5px; } .card { padding: 16px; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------------------------------------------------------------------
+  // Question bank — strictly ЛР№1 (распад разрыва) и ЛР№2 (сопло + струя)
+  // ---------------------------------------------------------------------
+  var QUESTIONS = [
+    {
+      id: "l1-seq", lab: 1, type: "sequence", timeSec: 50,
+      prompt: "ЛР№1. Восстановите порядок действий при подготовке расчёта в ANSYS Fluent.",
+      items: [
+        "Geometry — ступенчатый плоский канал (Planar)",
+        "Models — Energy ON, Viscous = Inviscid",
+        "Solver — Density-Based, Time = Transient",
+        "Solution Methods — Flux Type AUSM, Explicit, Courant ≤ 0,25",
+        "Boundary Conditions — Pressure Inlet зоны ОВД",
+        "Initialization — Standard + Patch зоны ОВД",
+        "Run Calculation — расчёт по шагам времени"
+      ],
+      correctOrder: [0,1,2,3,4,5,6]
+    },
+    {
+      id: "l1-mcq-transient", lab: 1, type: "mcq", timeSec: 30,
+      prompt: "ЛР№1. Почему выбрана постановка Time = Transient, а не Steady, как в ЛР№2?",
+      options: [
+        "Transient считается быстрее на одинаковой сетке",
+        "Процесс нестационарный: фронт ударной волны и волна разрежения перемещаются во времени — нужна производная ∂/∂t",
+        "Transient обязателен для решателя Density-Based",
+        "Steady не поддерживает постановку Planar"
+      ],
+      correctIndex: 1
+    },
+    {
+      id: "l1-mcq-ausm", lab: 1, type: "mcq", timeSec: 30,
+      prompt: "ЛР№1. Зачем для этой задачи выбрана схема Flux Type = AUSM?",
+      options: [
+        "Она самая быстрая по времени счёта",
+        "Она численно поддерживает разрыв параметров p, ρ, v на фронте ударной волны",
+        "Она не требует задания числа Куранта",
+        "Она нужна только при осесимметричной постановке"
+      ],
+      correctIndex: 1
+    },
+    {
+      id: "l1-mcq-patch", lab: 1, type: "mcq", timeSec: 35,
+      prompt: "ЛР№1. Что физически реализует связка «Standard Initialization по всей области + Patch зоны ОВД»?",
+      options: [
+        "Два разных рабочих газа в разных зонах канала",
+        "Мгновенное снятие перегородки между зонами высокого и низкого давления — начальную задачу Римана",
+        "Пограничный слой на стенке канала",
+        "Турбулентные пульсации на входной границе"
+      ],
+      correctIndex: 1
+    },
+    {
+      id: "l1-short-courant", lab: 1, type: "short", timeSec: 60,
+      prompt: "ЛР№1. Своими словами, в одну-две фразы: почему при явной (Explicit) схеме по времени задано жёсткое ограничение на число Куранта (≤ 0,25)?",
+      hint: "Подсказка для проверяющего: ожидаются слова «устойчивость», «шаг по времени», «ячейка сетки»."
+    },
+    {
+      id: "l1-mcq-inviscid", lab: 1, type: "mcq", timeSec: 30,
+      prompt: "ЛР№1. Почему модель турбулентности здесь — Inviscid, а не Viscous, как в ЛР№2?",
+      options: [
+        "Вязкость вообще не действует на газы при высоком давлении",
+        "Макроструктуру скачка и волны разрежения определяют законы сохранения без вязких членов — вязкость здесь эффект второго порядка",
+        "Inviscid считается только на грубой сетке",
+        "Fluent не допускает Viscous вместе с Transient"
+      ],
+      correctIndex: 1
+    },
+    {
+      id: "l2-seq", lab: 2, type: "sequence", timeSec: 50,
+      prompt: "ЛР№2. Восстановите порядок действий при подготовке расчёта в ANSYS Fluent.",
+      items: [
+        "Geometry — сопло Лаваля + преграда (Axisymmetric)",
+        "Mesh — сгущение у критического сечения и у преграды",
+        "Models/Materials — Energy ON, Viscous, Ideal Gas",
+        "Boundary Conditions — Pressure Inlet / Outlet / Wall",
+        "Solution Initialization",
+        "Run Calculation — до сходимости невязок",
+        "Postprocessing — Contours, Reports → Forces"
+      ],
+      correctOrder: [0,1,2,3,4,5,6]
+    },
+    {
+      id: "l2-mcq-density", lab: 2, type: "mcq", timeSec: 30,
+      prompt: "ЛР№2. Почему для этого расчёта выбран решатель Density-Based?",
+      options: [
+        "Он быстрее на грубых сетках",
+        "При сверхзвуковом течении именно плотность определяет поле — нужно связанное решение по плотности совместно с уравнением энергии",
+        "Он единственный поддерживает осесимметричную постановку",
+        "Он не требует включения Energy"
+      ],
+      correctIndex: 1
+    },
+    {
+      id: "l2-match-panels", lab: 2, type: "matching", timeSec: 50,
+      prompt: "ЛР№2. Установите соответствие между панелью Fluent и тем, что в ней физически задаётся.",
+      left: ["Pressure Inlet (ресивер)", "Materials: Ideal Gas", "Models: Energy", "Wall на преграде"],
+      right: [
+        "параметры торможения p₀, T₀",
+        "уравнение состояния p = ρRT",
+        "интеграл Бернулли / уравнение энергии",
+        "условие непротекания — отсюда берётся Δp(r)"
+      ],
+      correctMap: [0,1,2,3]
+    },
+    {
+      id: "l2-mcq-mesh", lab: 2, type: "mcq", timeSec: 30,
+      prompt: "ЛР№2. Почему сетку сильно сгущают в области ожидаемой отошедшей ударной волны перед преградой?",
+      options: [
+        "Чтобы ускорить сходимость решения",
+        "Скачок — тонкий физический разрыв (адиабата Гюгонио); грубая сетка «размажет» фронт",
+        "Так требует настройка Density-Based",
+        "Чтобы уменьшить число итераций"
+      ],
+      correctIndex: 1
+    },
+    {
+      id: "l2-mcq-inlet", lab: 2, type: "mcq", timeSec: 30,
+      prompt: "ЛР№2. Какое граничное условие задаётся на входе в сопло (ресивер)?",
+      options: [
+        "Velocity Inlet с заданной скоростью потока",
+        "Mass Flow Inlet с заданным расходом газа",
+        "Pressure Inlet с параметрами торможения p₀ и T₀",
+        "Wall с заданной температурой"
+      ],
+      correctIndex: 2
+    },
+    {
+      id: "l2-mcq-entropy", lab: 2, type: "mcq", timeSec: 35,
+      prompt: "ЛР№2. Почему давление торможения p₀₂ за прямым скачком меньше p₀₁ перед ним, хотя статическое давление растёт?",
+      options: [
+        "Потому что скорость потока после скачка увеличивается",
+        "Потому что скачок — необратимый процесс: энтропия возрастает, часть энергии потока теряется",
+        "Потому что плотность газа после скачка уменьшается",
+        "Потому что площадь сечения перед преградой увеличивается"
+      ],
+      correctIndex: 1
+    },
+    {
+      id: "l2-mcq-converge", lab: 2, type: "mcq", timeSec: 30,
+      prompt: "ЛР№2. По какому признаку, помимо невязок, оценивают сходимость расчёта в этой работе?",
+      options: [
+        "По выходу на «полку» монитора силы на преграде (Report Definition → Monitor)",
+        "По количеству ячеек сетки",
+        "По времени расчёта в секундах",
+        "По значению числа Куранта"
+      ],
+      correctIndex: 0
+    },
+    {
+      id: "l2-short-detached", lab: 2, type: "short", timeSec: 60,
+      prompt: "ЛР№2. Своими словами, в одну-две фразы: почему перед сферической (затуплённой) преградой образуется именно отошедшая, а не присоединённая ударная волна?",
+      hint: "Подсказка для проверяющего: ожидаются слова «угол поворота потока», «β_max», «решения не существует»."
+    }
+  ];
+
+  // ---------------------------------------------------------------------
+  // small utilities
+  // ---------------------------------------------------------------------
+  function qs(sel, root) { return (root || document).querySelector(sel); }
+  function el(tag, attrs, children) {
+    var e = document.createElement(tag);
+    attrs = attrs || {};
+    for (var k in attrs) {
+      if (k === "class") e.className = attrs[k];
+      else if (k === "html") e.innerHTML = attrs[k];
+      else if (k === "text") e.textContent = attrs[k];
+      else if (k === "disabled") e.disabled = !!attrs[k];
+      else if (k.indexOf("on") === 0 && (typeof attrs[k] === "function" || attrs[k] === null)) { if (attrs[k]) e.addEventListener(k.slice(2), attrs[k]); }
+      else if (attrs[k] != null) e.setAttribute(k, attrs[k]);
+    }
+    (children || []).forEach(function (c) { if (c) e.appendChild(c); });
+    return e;
+  }
+  function loadProfile() {
+    try {
+      var raw = localStorage.getItem("diag_fluent_profile");
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+  function saveProfile(p) {
+    try { localStorage.setItem("diag_fluent_profile", JSON.stringify(p)); } catch (e) {}
+  }
+  function shuffle(arr, seedStr) {
+    var a = arr.slice();
+    var seed = 0;
+    for (var i = 0; i < seedStr.length; i++) seed = (seed * 31 + seedStr.charCodeAt(i)) >>> 0;
+    function rnd() { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }
+    for (var j = a.length - 1; j > 0; j--) {
+      var k = Math.floor(rnd() * (j + 1));
+      var tmp = a[j]; a[j] = a[k]; a[k] = tmp;
+    }
+    return a;
+  }
+  function toast(msg) {
+    var t = el("div", { class: "toast", text: msg });
+    document.body.appendChild(t);
+    setTimeout(function () { t.remove(); }, 2200);
+  }
+  function scoreAnswer(q, value) {
+    if (value == null) return false;
+    if (q.type === "mcq") return value === q.correctIndex;
+    if (q.type === "matching") {
+      if (!Array.isArray(value) || value.length !== q.correctMap.length) return false;
+      for (var i = 0; i < q.correctMap.length; i++) if (value[i] !== q.correctMap[i]) return false;
+      return true;
+    }
+    if (q.type === "sequence") {
+      if (!Array.isArray(value) || value.length !== q.correctOrder.length) return false;
+      for (var j = 0; j < q.correctOrder.length; j++) if (value[j] !== q.correctOrder[j]) return false;
+      return true;
+    }
+    return null; // short — ungraded, reviewed by the instructor
+  }
+
+  // ---------------------------------------------------------------------
+  // app state — fully self-paced, client-only, no login / no live sync
+  // ---------------------------------------------------------------------
+  var app = qs("#app");
+  var profile = loadProfile();
+  var state = { phase: "profile", index: -1, startedAt: 0, answers: {}, draft: null };
+
+  function seedFor(qid) { return (profile ? profile.fio + profile.group : "x") + qid; }
+
+  function startQuiz() {
+    state.phase = "running"; state.index = 0; state.startedAt = Date.now();
+    state.answers = {}; state.draft = null;
+    draw();
+  }
+  function submitCurrent(value) {
+    var q = QUESTIONS[state.index];
+    state.answers[q.id] = { value: value, correct: scoreAnswer(q, value) };
+    goNext();
+  }
+  function goNext() {
+    if (state.index + 1 >= QUESTIONS.length) { state.phase = "finished"; draw(); return; }
+    state.index += 1; state.startedAt = Date.now(); state.draft = null;
+    draw();
+  }
+
+  var timerRaf = null;
+  function startTimer(q) {
+    if (timerRaf) cancelAnimationFrame(timerRaf);
+    function tick() {
+      var bar = qs("#qtimer");
+      if (!bar) return;
+      var elapsed = (Date.now() - state.startedAt) / 1000;
+      var frac = Math.max(0, 1 - elapsed / q.timeSec);
+      var inner = bar.firstChild;
+      if (inner) inner.style.width = (frac * 100) + "%";
+      bar.classList.toggle("low", frac < 0.2);
+      if (frac <= 0) { submitCurrent(state.draft); return; }
+      timerRaf = requestAnimationFrame(tick);
+    }
+    tick();
+  }
+
+  // ---------------------------------------------------------------------
+  // screens
+  // ---------------------------------------------------------------------
+  function renderProfileForm() {
+    var fioInput = el("input", { type: "text", placeholder: "Фамилия Имя", value: profile ? profile.fio : "" });
+    var groupInput = el("input", { type: "text", placeholder: "Группа, например А942Б", value: profile ? profile.group : "" });
+    var btn = el("button", {
+      class: "primary", text: "Начать диагностику (" + QUESTIONS.length + " вопросов)",
+      onclick: function () {
+        var fio = fioInput.value.trim(), group = groupInput.value.trim();
+        if (!fio || !group) { toast("Укажите ФИО и группу"); return; }
+        profile = { fio: fio, group: group };
+        saveProfile(profile);
+        startQuiz();
+      }
+    });
+    return el("div", { class: "card" }, [
+      el("div", { class: "eyebrow", text: "ЛР№1 и ЛР№2 · Современные информационные технологии" }),
+      el("h1", { text: "Диагностика Fluent", style: "margin-top:8px;font-size:28px;" }),
+      el("p", { class: "muted", style: "margin-top:10px;", text: "14 вопросов, у каждого — своё ограничение по времени. Таймер идёт автоматически и сам отправляет ответ, если время вышло. Страница работает в любом браузере без входа в аккаунт — просто не обновляйте и не закрывайте её до конца." }),
+      el("div", { style: "display:flex;flex-direction:column;gap:10px;margin-top:18px;" }, [fioInput, groupInput, btn])
+    ]);
+  }
+
+  function renderQuestion() {
+    var q = QUESTIONS[state.index];
+    var content;
+    if (q.type === "mcq") content = renderMcq(q);
+    else if (q.type === "matching") content = renderMatching(q);
+    else if (q.type === "sequence") content = renderSequence(q);
+    else content = renderShort(q);
+    return el("div", { class: "card qa-stage" }, [
+      el("div", { class: "flex-between" }, [
+        el("span", { class: "lab-tag " + (q.lab === 1 ? "l1" : "l2"), text: "ЛР№" + q.lab }),
+        el("span", { class: "mono muted", text: "Вопрос " + (state.index + 1) + " из " + QUESTIONS.length })
+      ]),
+      el("div", { class: "big-q", text: q.prompt }),
+      el("div", { id: "qtimer", class: "timerbar" }, [el("div", { style: "width:100%" })]),
+      content
+    ]);
+  }
+
+  function renderMcq(q) {
+    var box = el("div", { style: "display:flex;flex-direction:column;gap:9px;" });
+    q.options.forEach(function (opt, i) {
+      var row = el("div", {
+        class: "optrow",
+        onclick: function () {
+          state.draft = i;
+          Array.prototype.forEach.call(box.children, function (c, idx) { c.classList.toggle("selected", idx === i); });
+        }
+      }, [el("span", { text: opt })]);
+      box.appendChild(row);
+    });
+    var btn = el("button", {
+      class: "primary", text: "Отправить",
+      onclick: function () { if (state.draft == null) { toast("Выберите вариант"); return; } submitCurrent(state.draft); }
+    });
+    return el("div", { style: "display:flex;flex-direction:column;gap:14px;" }, [box, btn]);
+  }
+
+  function renderMatching(q) {
+    state.draft = q.left.map(function () { return null; });
+    var rightOrder = shuffle(q.right.map(function (_, i) { return i; }), seedFor(q.id));
+    var box = el("div", { style: "display:flex;flex-direction:column;gap:10px;" });
+    q.left.forEach(function (leftText, i) {
+      var sel = el("select", {});
+      sel.appendChild(el("option", { value: "", text: "— выберите —" }));
+      rightOrder.forEach(function (ri) { sel.appendChild(el("option", { value: String(ri), text: q.right[ri] })); });
+      sel.addEventListener("change", function () { state.draft[i] = sel.value === "" ? null : parseInt(sel.value, 10); });
+      box.appendChild(el("div", { class: "field-row" }, [el("span", { text: leftText }), sel]));
+    });
+    var btn = el("button", {
+      class: "primary", text: "Отправить",
+      onclick: function () {
+        if (state.draft.some(function (v) { return v == null; })) { toast("Заполните все пары"); return; }
+        submitCurrent(state.draft.slice());
+      }
+    });
+    return el("div", { style: "display:flex;flex-direction:column;gap:14px;" }, [box, btn]);
+  }
+
+  function renderSequence(q) {
+    var n = q.items.length;
+    state.draft = q.items.map(function () { return null; });
+    var order = shuffle(q.items.map(function (_, i) { return i; }), seedFor(q.id));
+    var box = el("div", { style: "display:flex;flex-direction:column;gap:9px;" });
+    order.forEach(function (origIndex) {
+      var sel = el("select", {});
+      sel.appendChild(el("option", { value: "", text: "№" }));
+      for (var p = 1; p <= n; p++) sel.appendChild(el("option", { value: String(p), text: String(p) }));
+      sel.addEventListener("change", function () {
+        var pos = sel.value === "" ? null : parseInt(sel.value, 10) - 1;
+        state.draft[origIndex] = pos;
+      });
+      box.appendChild(el("div", { class: "seq-row" }, [sel, el("span", { text: q.items[origIndex] })]));
+    });
+    var btn = el("button", {
+      class: "primary", text: "Отправить",
+      onclick: function () {
+        var positions = state.draft;
+        if (positions.some(function (v) { return v == null; })) { toast("Укажите номер для каждого пункта"); return; }
+        var seen = {}; var dup = false;
+        positions.forEach(function (p) { if (seen[p]) dup = true; seen[p] = true; });
+        if (dup) { toast("Номера не должны повторяться"); return; }
+        var orderOut = new Array(n);
+        positions.forEach(function (pos, origIndex) { orderOut[pos] = origIndex; });
+        submitCurrent(orderOut);
+      }
+    });
+    return el("div", { style: "display:flex;flex-direction:column;gap:14px;" }, [
+      el("p", { class: "hint", text: "Укажите порядковый номер (1…" + n + ") для каждого пункта." }), box, btn
+    ]);
+  }
+
+  function renderShort(q) {
+    var ta = el("textarea", { placeholder: "Ваш ответ…" });
+    ta.addEventListener("input", function () { state.draft = ta.value; });
+    var btn = el("button", {
+      class: "primary", text: "Отправить",
+      onclick: function () { if (!ta.value.trim()) { toast("Напишите ответ"); return; } submitCurrent(ta.value.trim()); }
+    });
+    return el("div", { style: "display:flex;flex-direction:column;gap:14px;" }, [ta, btn]);
+  }
+
+  function renderFinished() {
+    var score = 0, graded = 0;
+    var shortAnswers = [];
+    QUESTIONS.forEach(function (q) {
+      var a = state.answers[q.id];
+      if (q.type === "short") { shortAnswers.push({ prompt: q.prompt, value: a ? a.value : "" }); return; }
+      graded += 1;
+      if (a && a.correct) score += 1;
+    });
+
+    var gradedQs = QUESTIONS.filter(function (q) { return q.type !== "short"; });
+    var summaryLine = profile.fio + "; " + profile.group + "; " + score + "/" + graded +
+      gradedQs.map(function (q) {
+        var a = state.answers[q.id];
+        return "; " + q.id + "=" + (a ? (a.correct ? "1" : "0") : "-");
+      }).join("");
+
+    var rows = gradedQs.map(function (q) {
+      var a = state.answers[q.id];
+      var ok = a ? a.correct : null;
+      return el("tr", {}, [
+        el("td", {}, [el("span", { class: "lab-tag " + (q.lab === 1 ? "l1" : "l2"), text: "ЛР№" + q.lab })]),
+        el("td", { text: q.prompt.length > 70 ? q.prompt.slice(0, 70) + "…" : q.prompt }),
+        el("td", { text: ok === true ? "верно" : ok === false ? "неверно" : "—" })
+      ]);
+    });
+    var table = el("table", {}, [
+      el("thead", {}, [el("tr", {}, [el("th", { text: "Раб." }), el("th", { text: "Вопрос" }), el("th", { text: "Результат" })])]),
+      el("tbody", {}, rows)
+    ]);
+
+    var shortBlock = shortAnswers.length ? el("div", { style: "margin-top:16px;" }, [
+      el("h3", { text: "Открытые вопросы (проверяет преподаватель)", style: "font-size:15px;" }),
+      el("div", { style: "display:flex;flex-direction:column;gap:10px;margin-top:8px;" },
+        shortAnswers.map(function (s) {
+          return el("div", { style: "padding:12px;background:var(--surface-2);border-radius:10px;" }, [
+            el("div", { class: "hint", text: s.prompt }),
+            el("div", { style: "margin-top:6px;", text: s.value || "(нет ответа)" })
+          ]);
+        }))
+    ]) : null;
+
+    var copyBtn = el("button", {
+      class: "navy", text: "Скопировать результат",
+      onclick: function () {
+        function fallback() {
+          try {
+            var ta2 = el("textarea", { style: "position:fixed;left:-9999px;" });
+            ta2.value = summaryLine; document.body.appendChild(ta2); ta2.select();
+            document.execCommand("copy"); ta2.remove();
+            toast("Скопировано");
+          } catch (e) { toast("Не удалось скопировать — выделите строку ниже вручную"); }
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(summaryLine).then(function () { toast("Скопировано"); }).catch(fallback);
+        } else fallback();
+      }
+    });
+
+    return el("div", { class: "wrap" }, [
+      el("div", { class: "card center" }, [
+        el("div", { class: "eyebrow", text: "Диагностика Fluent — результат" }),
+        el("h2", { text: profile.fio, style: "margin-top:8px;" }),
+        el("p", { class: "muted", text: profile.group }),
+        el("p", { style: "margin-top:14px;font-size:26px;font-weight:700;font-family:var(--font-head);", text: score + " из " + graded }),
+        el("p", { class: "muted", text: "правильных ответов (автооценка; открытые вопросы — отдельно)" })
+      ]),
+      el("div", { class: "card" }, [
+        el("h3", { text: "По вопросам", style: "font-size:15px;" }),
+        el("div", { class: "tablewrap", style: "margin-top:10px;" }, [table]),
+        shortBlock,
+        el("div", { class: "flex-between", style: "margin-top:18px;" }, [
+          el("p", { class: "hint", style: "max-width:60%;", text: "Сделайте скрин этого экрана и пришлите преподавателю, либо скопируйте строку результата и отправьте в чат." }),
+          copyBtn
+        ]),
+        el("div", { class: "mono muted", style: "margin-top:10px;font-size:11.5px;word-break:break-all;background:var(--surface-2);padding:8px 10px;border-radius:8px;", text: summaryLine })
+      ])
+    ]);
+  }
+
+  function draw() {
+    app.innerHTML = "";
+    if (state.phase === "profile") app.appendChild(el("div", { class: "wrap" }, [renderProfileForm()]));
+    else if (state.phase === "running") app.appendChild(el("div", { class: "wrap" }, [renderQuestion()]));
+    else app.appendChild(renderFinished());
+    if (state.phase === "running") startTimer(QUESTIONS[state.index]);
+  }
+
+  draw();
+})();
+</script>
+</body>
+</html>
