@@ -320,6 +320,41 @@
     document.body.appendChild(t);
     setTimeout(function () { t.remove(); }, 2200);
   }
+
+  // ---------------------------------------------------------------------
+  // background submission to a Google Form -> Google Sheet
+  // (fire-and-forget; the on-screen summary + copy button stay as backup)
+  // ---------------------------------------------------------------------
+  var GOOGLE_FORM = {
+    action: "https://docs.google.com/forms/d/e/1FAIpQLScLVegxlsq_Qtjh-z0MtBgXZoJ-W83QDW6BJywr19jYPInh2Q/formResponse",
+    entries: {
+      fio: "entry.1304088841",
+      group: "entry.1508344400",
+      score: "entry.2005930364",
+      breakdown: "entry.1232961591",
+      short1: "entry.922098392",
+      short2: "entry.1366860000"
+    }
+  };
+  var formSubmitted = false;
+  function submitToGoogleForm(fio, group, scoreStr, breakdownStr, short1, short2) {
+    if (formSubmitted) return;
+    formSubmitted = true;
+    try {
+      var body = new URLSearchParams();
+      body.set(GOOGLE_FORM.entries.fio, fio);
+      body.set(GOOGLE_FORM.entries.group, group);
+      body.set(GOOGLE_FORM.entries.score, scoreStr);
+      body.set(GOOGLE_FORM.entries.breakdown, breakdownStr);
+      body.set(GOOGLE_FORM.entries.short1, short1 || "");
+      body.set(GOOGLE_FORM.entries.short2, short2 || "");
+      fetch(GOOGLE_FORM.action, {
+        method: "POST", mode: "no-cors",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: body.toString()
+      });
+    } catch (e) { /* best-effort — on-screen summary + copy button remain as fallback */ }
+  }
   function scoreAnswer(q, value) {
     if (value == null) return false;
     if (q.type === "mcq") return value === q.correctIndex;
@@ -514,11 +549,18 @@
     });
 
     var gradedQs = QUESTIONS.filter(function (q) { return q.type !== "short"; });
-    var summaryLine = profile.fio + "; " + profile.group + "; " + score + "/" + graded +
-      gradedQs.map(function (q) {
-        var a = state.answers[q.id];
-        return "; " + q.id + "=" + (a ? (a.correct ? "1" : "0") : "-");
-      }).join("");
+    var breakdownStr = gradedQs.map(function (q) {
+      var a = state.answers[q.id];
+      return q.id + "=" + (a ? (a.correct ? "1" : "0") : "-");
+    }).join("; ");
+    var scoreStr = score + "/" + graded;
+    var summaryLine = profile.fio + "; " + profile.group + "; " + scoreStr + "; " + breakdownStr;
+
+    submitToGoogleForm(
+      profile.fio, profile.group, scoreStr, breakdownStr,
+      shortAnswers[0] ? shortAnswers[0].value : "",
+      shortAnswers[1] ? shortAnswers[1].value : ""
+    );
 
     var rows = gradedQs.map(function (q) {
       var a = state.answers[q.id];
@@ -575,7 +617,7 @@
         el("div", { class: "tablewrap", style: "margin-top:10px;" }, [table]),
         shortBlock,
         el("div", { class: "flex-between", style: "margin-top:18px;" }, [
-          el("p", { class: "hint", style: "max-width:60%;", text: "Сделайте скрин этого экрана и пришлите преподавателю, либо скопируйте строку результата и отправьте в чат." }),
+          el("p", { class: "hint", style: "max-width:60%;", text: "Результат уже отправлен преподавателю автоматически. Если хотите подстраховаться — сделайте скрин этого экрана или скопируйте строку результата." }),
           copyBtn
         ]),
         el("div", { class: "mono muted", style: "margin-top:10px;font-size:11.5px;word-break:break-all;background:var(--surface-2);padding:8px 10px;border-radius:8px;", text: summaryLine })
