@@ -127,18 +127,19 @@
   // ---------------------------------------------------------------------
   var QUESTIONS = [
     {
-      id: "l1-seq", lab: 1, type: "sequence", timeSec: 50,
+      id: "l1-seq", lab: 1, type: "sequence", timeSec: 60,
       prompt: "ЛР№1. Восстановите порядок действий при подготовке расчёта в ANSYS Fluent.",
       items: [
-        "Geometry — ступенчатый плоский канал (Planar)",
-        "Models — Energy ON, Viscous = Inviscid",
-        "Solver — Density-Based, Time = Transient",
-        "Solution Methods — Flux Type AUSM, Explicit, Courant ≤ 0,25",
-        "Boundary Conditions — Pressure Inlet зоны ОВД",
+        "Geometry — ступенчатый плоский канал",
+        "Mesh — структурированная сетка, элемент ≈ 0,5 мм",
+        "General — Density-Based, Transient, Planar",
+        "Models / Materials — Energy, Viscous = Inviscid, Ideal Gas",
+        "Boundary Conditions — Pressure Inlet, параметры ОВД",
+        "Solution Methods — AUSM, Explicit, Courant ≤ 0,25",
         "Initialization — Standard + Patch зоны ОВД",
         "Run Calculation — расчёт по шагам времени"
       ],
-      correctOrder: [0,1,2,3,4,5,6]
+      correctOrder: [0,1,2,3,4,5,6,7]
     },
     {
       id: "l1-mcq-transient", lab: 1, type: "mcq", timeSec: 30,
